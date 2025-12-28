@@ -1,0 +1,394 @@
+//+------------------------------------------------------------------+
+//|                    OPTIMIZED SETTINGS FOR MARKET MAKER EA        |
+//|                                                                  |
+//| Copy these settings directly into EA inputs when attaching       |
+//+------------------------------------------------------------------+
+
+//==================================================================
+//  EUR/USD - MAJOR FOREX PAIR
+//==================================================================
+//
+// Characteristics:
+// - Average Daily Range: 70-100 pips
+// - Typical Spread: 0.5-2 pips (5-20 points on 5-digit broker)
+// - Volatility: Low to Moderate
+// - Best Trading Hours: London/NY session (8:00-17:00 GMT)
+//
+//------------------------------------------------------------------
+
+=== EUR/USD - CONSERVATIVE (Account: $500+) ===
+
+GridLevels = 4
+GridStep = 150                    // 15 pips spacing
+LotSize = 0.01
+TakeProfitPoints = 100            // 10 pips profit per order
+MagicNumber = 111001
+
+MaxSpreadPoints = 25              // 2.5 pips max
+MaxPositionSize = 0.40            // Max 4 positions
+DailyLossLimit = 50.0
+UseVolatilityFilter = true
+VolatilityPeriod = 20
+MaxVolatilityMultiplier = 2.5
+
+UseTradingHours = true
+StartHour = 8                     // London open
+EndHour = 17                      // Before NY close
+
+Slippage = 20
+CloseOnDailyLimit = true
+OrderDistanceMin = 30             // 3 pips minimum
+
+
+=== EUR/USD - MODERATE (Account: $1000+) ===
+
+GridLevels = 5
+GridStep = 120                    // 12 pips spacing
+LotSize = 0.02
+TakeProfitPoints = 80             // 8 pips profit
+MagicNumber = 111002
+
+MaxSpreadPoints = 30
+MaxPositionSize = 1.0             // Max 10 positions
+DailyLossLimit = 100.0
+UseVolatilityFilter = true
+VolatilityPeriod = 20
+MaxVolatilityMultiplier = 2.0
+
+UseTradingHours = true
+StartHour = 7
+EndHour = 18
+
+Slippage = 20
+CloseOnDailyLimit = true
+OrderDistanceMin = 25
+
+
+=== EUR/USD - AGGRESSIVE (Account: $2000+) ===
+
+GridLevels = 7
+GridStep = 80                     // 8 pips spacing
+LotSize = 0.03
+TakeProfitPoints = 60             // 6 pips profit
+MagicNumber = 111003
+
+MaxSpreadPoints = 35
+MaxPositionSize = 2.0
+DailyLossLimit = 200.0
+UseVolatilityFilter = true
+VolatilityPeriod = 15
+MaxVolatilityMultiplier = 2.0
+
+UseTradingHours = false           // Trade all hours
+StartHour = 0
+EndHour = 23
+
+Slippage = 25
+CloseOnDailyLimit = true
+OrderDistanceMin = 20
+
+
+=== EUR/USD - SCALPING (Account: $3000+, ECN only) ===
+
+GridLevels = 6
+GridStep = 50                     // 5 pips spacing
+LotSize = 0.05
+TakeProfitPoints = 40             // 4 pips profit
+MagicNumber = 111004
+
+MaxSpreadPoints = 15              // Tight spread required
+MaxPositionSize = 3.0
+DailyLossLimit = 150.0
+UseVolatilityFilter = true
+VolatilityPeriod = 10
+MaxVolatilityMultiplier = 1.5
+
+UseTradingHours = true
+StartHour = 8
+EndHour = 16                      // Active hours only
+
+Slippage = 10
+CloseOnDailyLimit = true
+OrderDistanceMin = 15
+
+
+//==================================================================
+//  BTC/USD - CRYPTOCURRENCY
+//==================================================================
+//
+// Characteristics:
+// - Average Daily Range: 500-2000 USD (varies greatly)
+// - Typical Spread: 10-50 USD
+// - Volatility: HIGH
+// - Best Trading Hours: 24/7 but most active during US hours
+// - Note: Use BTC/USD in points (if BTC = $50,000, 1 point = $0.01)
+//
+//------------------------------------------------------------------
+
+=== BTC/USD - CONSERVATIVE (Account: $2000+) ===
+
+GridLevels = 3
+GridStep = 50000                  // ~$500 spacing (depends on broker)
+LotSize = 0.01
+TakeProfitPoints = 30000          // ~$300 profit
+MagicNumber = 222001
+
+MaxSpreadPoints = 5000            // ~$50 max spread
+MaxPositionSize = 0.30
+DailyLossLimit = 200.0
+UseVolatilityFilter = true
+VolatilityPeriod = 24
+MaxVolatilityMultiplier = 3.0     // Crypto is volatile
+
+UseTradingHours = false           // 24/7 market
+StartHour = 0
+EndHour = 23
+
+Slippage = 100
+CloseOnDailyLimit = true
+OrderDistanceMin = 10000          // ~$100 minimum
+
+
+=== BTC/USD - MODERATE (Account: $5000+) ===
+
+GridLevels = 4
+GridStep = 40000                  // ~$400 spacing
+LotSize = 0.02
+TakeProfitPoints = 25000          // ~$250 profit
+MagicNumber = 222002
+
+MaxSpreadPoints = 7500
+MaxPositionSize = 0.80
+DailyLossLimit = 400.0
+UseVolatilityFilter = true
+VolatilityPeriod = 24
+MaxVolatilityMultiplier = 2.5
+
+UseTradingHours = true
+StartHour = 13                    // US morning
+EndHour = 22                      // US evening
+
+Slippage = 150
+CloseOnDailyLimit = true
+OrderDistanceMin = 8000
+
+
+=== BTC/USD - AGGRESSIVE (Account: $10000+) ===
+
+GridLevels = 5
+GridStep = 30000                  // ~$300 spacing
+LotSize = 0.05
+TakeProfitPoints = 20000          // ~$200 profit
+MagicNumber = 222003
+
+MaxSpreadPoints = 10000
+MaxPositionSize = 2.5
+DailyLossLimit = 800.0
+UseVolatilityFilter = true
+VolatilityPeriod = 20
+MaxVolatilityMultiplier = 2.5
+
+UseTradingHours = false
+StartHour = 0
+EndHour = 23
+
+Slippage = 200
+CloseOnDailyLimit = true
+OrderDistanceMin = 5000
+
+
+//==================================================================
+//  ADDITIONAL PAIRS - QUICK REFERENCE
+//==================================================================
+
+=== GBP/USD - MODERATE ===
+GridLevels = 5
+GridStep = 150                    // 15 pips (more volatile than EUR/USD)
+LotSize = 0.01
+TakeProfitPoints = 100
+MaxSpreadPoints = 40              // Wider spread than EUR/USD
+DailyLossLimit = 120.0
+UseVolatilityFilter = true
+UseTradingHours = true
+StartHour = 8
+EndHour = 17
+
+
+=== USD/JPY - MODERATE ===
+GridLevels = 5
+GridStep = 120                    // ~12 pips
+LotSize = 0.02
+TakeProfitPoints = 80
+MaxSpreadPoints = 25
+DailyLossLimit = 100.0
+UseVolatilityFilter = true
+UseTradingHours = true
+StartHour = 0                     // Tokyo session
+EndHour = 10
+
+
+=== GOLD (XAU/USD) - MODERATE ===
+GridLevels = 4
+GridStep = 500                    // $5 spacing
+LotSize = 0.01
+TakeProfitPoints = 400            // $4 profit
+MaxSpreadPoints = 300             // $3 max spread
+DailyLossLimit = 150.0
+UseVolatilityFilter = true
+MaxVolatilityMultiplier = 2.5
+UseTradingHours = true
+StartHour = 8
+EndHour = 17
+
+
+=== ETH/USD - MODERATE ===
+GridLevels = 4
+GridStep = 3000                   // ~$30 spacing
+LotSize = 0.02
+TakeProfitPoints = 2000           // ~$20 profit
+MaxSpreadPoints = 1000
+DailyLossLimit = 300.0
+UseVolatilityFilter = true
+MaxVolatilityMultiplier = 3.0
+UseTradingHours = false
+
+
+//==================================================================
+//  IMPORTANT CALIBRATION NOTES
+//==================================================================
+
+For BTC/USD and other crypto pairs, you MUST verify how your broker
+quotes prices:
+
+METHOD 1: Check Point Value
+- Open Symbol Specification in MT5
+- Look for "Point" value
+- If BTC is $50,000 and Point = 0.01, then:
+  * GridStep = 50000 means ~$500
+  * TakeProfitPoints = 10000 means ~$100
+
+METHOD 2: Manual Testing
+1. Note current BTC price (e.g., $50,000)
+2. Set GridStep = 10000
+3. Check where EA places orders
+4. If orders are ~$100 apart, your calculation is correct
+5. Adjust GridStep accordingly
+
+FOREX PAIRS (5-digit brokers):
+- 10 points = 1 pip
+- GridStep = 100 means 10 pips
+- Always divide by 10 to get pips
+
+FOREX PAIRS (4-digit brokers - rare):
+- 1 point = 1 pip
+- GridStep = 10 means 10 pips
+
+
+//==================================================================
+//  OPTIMIZATION WORKFLOW
+//==================================================================
+
+STEP 1: Start Conservative
+- Use conservative settings for your pair
+- Run for 3-5 days on DEMO account
+- Monitor daily P/L, max drawdown, number of positions
+
+STEP 2: Analyze Results
+- If hitting MaxPositionSize often → Reduce GridLevels or increase GridStep
+- If daily loss limit hit → Reduce LotSize or increase DailyLossLimit
+- If no trades → Reduce GridStep or MaxSpreadPoints
+- If too many small profits → Increase TakeProfitPoints
+
+STEP 3: Adjust Grid Spacing
+- Calculate pair's Average Daily Range (ADR)
+- Optimal GridStep = ADR / (GridLevels × 4)
+- Example: EUR/USD ADR = 80 pips
+  * For GridLevels = 5: GridStep = 80 / 20 = 4 pips = 40 points
+
+STEP 4: Fine-tune Take Profit
+- TakeProfit should be 50-80% of GridStep
+- Too small → Many small wins but high commission impact
+- Too large → Few wins, positions held too long
+
+STEP 5: Optimize Risk
+- Risk per grid level = (LotSize × GridStep in currency) / AccountBalance
+- Keep total risk under 10% of account
+- Formula: MaxRisk = GridLevels × LotSize × GridStep
+
+
+//==================================================================
+//  BROKER-SPECIFIC ADJUSTMENTS
+//==================================================================
+
+ECN/STP Brokers (Raw Spread):
+- Reduce MaxSpreadPoints by 30-50%
+- Can use tighter GridStep
+- Enable scalping settings
+- Lower Slippage value
+
+Market Maker Brokers:
+- Increase MaxSpreadPoints by 50%
+- Use larger GridStep
+- Avoid news trading
+- Higher Slippage value
+
+Crypto Exchanges:
+- Expect high volatility
+- Use wide GridStep
+- Set high MaxVolatilityMultiplier
+- Allow large Slippage (100-200)
+
+
+//==================================================================
+//  SEASONAL ADJUSTMENTS
+//==================================================================
+
+High Volatility Periods (News, Market Stress):
+- Increase GridStep by 50%
+- Reduce GridLevels by 2
+- Enable volatility filter
+- Reduce MaxPositionSize
+
+Low Volatility Periods (Asian Session, Holidays):
+- Decrease GridStep by 30%
+- Can increase GridLevels
+- May disable volatility filter
+- Normal position sizing
+
+Summer (June-August):
+- Forex volatility typically lower
+- Can tighten grid spacing
+- Watch for sudden moves (thin liquidity)
+
+December Holidays:
+- Reduce all position sizes by 50%
+- Widen spreads expected
+- Consider disabling EA Dec 22-Jan 2
+
+
+//==================================================================
+//  QUICK START RECOMMENDATIONS
+//==================================================================
+
+BEGINNER (First time using Market Maker EA):
+→ Use EUR/USD Conservative settings
+→ Demo account for minimum 2 weeks
+→ Start with $500+ account if going live
+→ Trade only London/NY session
+
+INTERMEDIATE (Experience with grid trading):
+→ EUR/USD Moderate or BTC/USD Conservative
+→ Can trade multiple sessions
+→ $1000+ account recommended
+→ Monitor daily for first week
+
+ADVANCED (Professional trader):
+→ Customize based on your analysis
+→ Can run multiple pairs with different Magic numbers
+→ Use aggressive settings with proper risk management
+→ Consider VPS for 24/7 operation
+
+
+//==================================================================
+// END OF CONFIGURATION FILE
+//==================================================================
