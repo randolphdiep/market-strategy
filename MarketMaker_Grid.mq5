@@ -33,6 +33,10 @@ input int      Slippage = 10;                     // Maximum slippage in points
 input bool     CloseOnDailyLimit = true;          // Close all on daily limit
 input int      OrderDistanceMin = 10;             // Minimum distance from price (points)
 
+input group "=== Grid Recreation Settings ==="
+input int      RecreateEveryNBars = 0;            // Recreate grid every N bars (0=disabled)
+input bool     UseBarBasedRecreation = false;     // Enable bar-based grid recreation
+
 //--- Global Variables
 datetime lastBarTime;
 double dailyStartBalance;
@@ -40,6 +44,7 @@ double dailyProfit;
 int currentDay;
 double averageVolatility;
 int volatilityHandle;
+int barsSinceGridRecreation = 0;  // Track bars since last grid recreation
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -98,7 +103,10 @@ void OnTick()
    datetime currentBarTime = iTime(_Symbol, PERIOD_CURRENT, 0);
    bool isNewBar = (currentBarTime != lastBarTime);
    if(isNewBar)
+   {
       lastBarTime = currentBarTime;
+      barsSinceGridRecreation++;  // Increment bar counter
+   }
 
    //--- Update daily tracking
    UpdateDailyTracking();
@@ -118,9 +126,28 @@ void OnTick()
    //--- Manage existing orders
    ManageOrders();
 
-   //--- Place grid orders (only on new bar or if grid is incomplete)
+   //--- Determine if grid should be recreated
+   bool shouldRecreateGrid = false;
+
+   // Standard trigger: new bar or incomplete grid
    if(isNewBar || CountGridOrders() < GridLevels * 2)
+      shouldRecreateGrid = true;
+
+   // Bar-based trigger: recreate every N bars
+   if(UseBarBasedRecreation && RecreateEveryNBars > 0)
+   {
+      if(barsSinceGridRecreation >= RecreateEveryNBars)
+         shouldRecreateGrid = true;
+      else
+         shouldRecreateGrid = false;  // Override standard trigger if bar-based is active
+   }
+
+   //--- Place grid orders if needed
+   if(shouldRecreateGrid)
+   {
       PlaceGridOrders();
+      barsSinceGridRecreation = 0;  // Reset counter
+   }
 }
 
 //+------------------------------------------------------------------+
