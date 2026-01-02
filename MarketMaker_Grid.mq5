@@ -39,11 +39,21 @@ double dailyProfit;
 int currentDay;
 int barsSinceGridRecreation = 0;  // Track bars since last grid recreation
 
+//--- Cached symbol properties
+double symbolPoint;
+int symbolDigits;
+string symbolName;
+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
 {
+   //--- Cache symbol properties
+   symbolName = _Symbol;
+   symbolPoint = SymbolInfoDouble(symbolName, SYMBOL_POINT);
+   symbolDigits = (int)SymbolInfoInteger(symbolName, SYMBOL_DIGITS);
+
    //--- Initialize daily tracking
    MqlDateTime dt;
    TimeToStruct(TimeCurrent(), dt);
@@ -200,11 +210,13 @@ bool CheckTradingHours()
 int CountGridOrders()
 {
    int count = 0;
+   int total = OrdersTotal();
 
-   for(int i = OrdersTotal() - 1; i >= 0; i--)
+   for(int i = 0; i < total; i++)
    {
-      ulong ticket = OrderGetTicket(i);
-      if(OrderGetString(ORDER_SYMBOL) == _Symbol && OrderGetInteger(ORDER_MAGIC) == MagicNumber)
+      if(OrderGetTicket(i) &&
+         OrderGetString(ORDER_SYMBOL) == symbolName &&
+         OrderGetInteger(ORDER_MAGIC) == MagicNumber)
          count++;
    }
 
@@ -216,31 +228,33 @@ int CountGridOrders()
 //+------------------------------------------------------------------+
 void PlaceGridOrders()
 {
-   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
-   int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+   double ask = SymbolInfoDouble(symbolName, SYMBOL_ASK);
+   double bid = SymbolInfoDouble(symbolName, SYMBOL_BID);
 
    //--- Remove all pending orders first
    DeleteAllPendingOrders();
 
+   //--- Pre-calculate step values
+   double gridStepPrice = GridStep * symbolPoint;
+   double tpPrice = TakeProfitPoints * symbolPoint;
+
    //--- Place buy limit orders below current price
    for(int i = 1; i <= GridLevels; i++)
    {
-      double price = NormalizeDouble(bid - GridStep * i * point, digits);
-      double tp = NormalizeDouble(price + TakeProfitPoints * point, digits);
+      double price = NormalizeDouble(bid - gridStepPrice * i, symbolDigits);
+      double tp = NormalizeDouble(price + tpPrice, symbolDigits);
 
-      if(price > 0 && !OrderExists(price, ORDER_TYPE_BUY_LIMIT))
+      if(price > 0)
          PlacePendingOrder(ORDER_TYPE_BUY_LIMIT, price, tp, 0);
    }
 
    //--- Place sell limit orders above current price
    for(int i = 1; i <= GridLevels; i++)
    {
-      double price = NormalizeDouble(ask + GridStep * i * point, digits);
-      double tp = NormalizeDouble(price - TakeProfitPoints * point, digits);
+      double price = NormalizeDouble(ask + gridStepPrice * i, symbolDigits);
+      double tp = NormalizeDouble(price - tpPrice, symbolDigits);
 
-      if(price > 0 && !OrderExists(price, ORDER_TYPE_SELL_LIMIT))
+      if(price > 0)
          PlacePendingOrder(ORDER_TYPE_SELL_LIMIT, price, tp, 0);
    }
 
@@ -248,25 +262,6 @@ void PlaceGridOrders()
    UpdateComment();
 }
 
-//+------------------------------------------------------------------+
-//| Check if order exists at price                                   |
-//+------------------------------------------------------------------+
-bool OrderExists(double price, ENUM_ORDER_TYPE orderType)
-{
-   for(int i = OrdersTotal() - 1; i >= 0; i--)
-   {
-      ulong ticket = OrderGetTicket(i);
-      if(OrderGetString(ORDER_SYMBOL) == _Symbol &&
-         OrderGetInteger(ORDER_MAGIC) == MagicNumber &&
-         OrderGetInteger(ORDER_TYPE) == orderType)
-      {
-         double orderPrice = OrderGetDouble(ORDER_PRICE_OPEN);
-         if(MathAbs(orderPrice - price) < SymbolInfoDouble(_Symbol, SYMBOL_POINT))
-            return true;
-      }
-   }
-   return false;
-}
 
 //+------------------------------------------------------------------+
 //| Place pending order                                              |
@@ -277,7 +272,7 @@ bool PlacePendingOrder(ENUM_ORDER_TYPE orderType, double price, double tp, doubl
    MqlTradeResult result = {};
 
    request.action = TRADE_ACTION_PENDING;
-   request.symbol = _Symbol;
+   request.symbol = symbolName;
    request.volume = LotSize;
    request.type = orderType;
    request.price = price;
@@ -300,10 +295,8 @@ bool PlacePendingOrder(ENUM_ORDER_TYPE orderType, double price, double tp, doubl
 //+------------------------------------------------------------------+
 void ManageOrders()
 {
-   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
-   datetime currentTime = TimeCurrent();
+   double bid = SymbolInfoDouble(symbolName, SYMBOL_BID);
+   double ask = SymbolInfoDouble(symbolName, SYMBOL_ASK);
 
    MqlTradeRequest request = {};
    MqlTradeResult result = {};
@@ -311,12 +304,14 @@ void ManageOrders()
    //--- Check and close positions that exceeded max hours
    if(MaxPositionHours > 0)
    {
-      for(int i = PositionsTotal() - 1; i >= 0; i--)
+      datetime currentTime = TimeCurrent();
+      int totalPos = PositionsTotal();
+
+      for(int i = totalPos - 1; i >= 0; i--)
       {
-         if(PositionGetSymbol(i) == _Symbol && PositionGetInteger(POSITION_MAGIC) == MagicNumber)
+         if(PositionGetSymbol(i) == symbolName && PositionGetInteger(POSITION_MAGIC) == MagicNumber)
          {
-            datetime positionOpenTime = (datetime)PositionGetInteger(POSITION_TIME);
-            int hoursOpen = (int)((currentTime - positionOpenTime) / 3600);
+            int hoursOpen = (int)((currentTime - (datetime)PositionGetInteger(POSITION_TIME)) / 3600);
 
             if(hoursOpen >= MaxPositionHours)
             {
@@ -325,7 +320,7 @@ void ManageOrders()
                ZeroMemory(request);
                request.action = TRADE_ACTION_DEAL;
                request.position = PositionGetInteger(POSITION_TICKET);
-               request.symbol = _Symbol;
+               request.symbol = symbolName;
                request.volume = PositionGetDouble(POSITION_VOLUME);
                request.type = (posType == POSITION_TYPE_BUY) ? ORDER_TYPE_SELL : ORDER_TYPE_BUY;
                request.price = (posType == POSITION_TYPE_BUY) ? bid : ask;
@@ -342,22 +337,26 @@ void ManageOrders()
    }
 
    //--- Check if pending orders are too close to current price
-   double minDistancePoints = OrderDistanceMin * point;
-
-   for(int i = OrdersTotal() - 1; i >= 0; i--)
+   if(OrderDistanceMin > 0)
    {
-      ulong ticket = OrderGetTicket(i);
-      if(OrderGetString(ORDER_SYMBOL) == _Symbol && OrderGetInteger(ORDER_MAGIC) == MagicNumber)
-      {
-         double orderPrice = OrderGetDouble(ORDER_PRICE_OPEN);
-         double distance = MathAbs(orderPrice - bid);
+      double minDistancePrice = OrderDistanceMin * symbolPoint;
+      int totalOrders = OrdersTotal();
 
-         if(distance < minDistancePoints)
+      for(int i = totalOrders - 1; i >= 0; i--)
+      {
+         if(OrderGetTicket(i) &&
+            OrderGetString(ORDER_SYMBOL) == symbolName &&
+            OrderGetInteger(ORDER_MAGIC) == MagicNumber)
          {
-            ZeroMemory(request);
-            request.action = TRADE_ACTION_REMOVE;
-            request.order = ticket;
-            OrderSend(request, result);
+            double orderPrice = OrderGetDouble(ORDER_PRICE_OPEN);
+
+            if(MathAbs(orderPrice - bid) < minDistancePrice)
+            {
+               ZeroMemory(request);
+               request.action = TRADE_ACTION_REMOVE;
+               request.order = OrderGetInteger(ORDER_TICKET);
+               OrderSend(request, result);
+            }
          }
       }
    }
@@ -368,15 +367,19 @@ void ManageOrders()
 //+------------------------------------------------------------------+
 void DeleteAllPendingOrders()
 {
-   for(int i = OrdersTotal() - 1; i >= 0; i--)
+   MqlTradeRequest request = {};
+   MqlTradeResult result = {};
+   int total = OrdersTotal();
+
+   for(int i = total - 1; i >= 0; i--)
    {
-      ulong ticket = OrderGetTicket(i);
-      if(OrderGetString(ORDER_SYMBOL) == _Symbol && OrderGetInteger(ORDER_MAGIC) == MagicNumber)
+      if(OrderGetTicket(i) &&
+         OrderGetString(ORDER_SYMBOL) == symbolName &&
+         OrderGetInteger(ORDER_MAGIC) == MagicNumber)
       {
-         MqlTradeRequest request = {};
-         MqlTradeResult result = {};
+         ZeroMemory(request);
          request.action = TRADE_ACTION_REMOVE;
-         request.order = ticket;
+         request.order = OrderGetInteger(ORDER_TICKET);
          OrderSend(request, result);
       }
    }
@@ -387,24 +390,27 @@ void DeleteAllPendingOrders()
 //+------------------------------------------------------------------+
 void CloseAllOrders()
 {
-   //--- Close all positions
-   for(int i = PositionsTotal() - 1; i >= 0; i--)
-   {
-      if(PositionGetSymbol(i) == _Symbol && PositionGetInteger(POSITION_MAGIC) == MagicNumber)
-      {
-         ulong ticket = PositionGetInteger(POSITION_TICKET);
-         MqlTradeRequest request = {};
-         MqlTradeResult result = {};
+   double bid = SymbolInfoDouble(symbolName, SYMBOL_BID);
+   double ask = SymbolInfoDouble(symbolName, SYMBOL_ASK);
 
+   MqlTradeRequest request = {};
+   MqlTradeResult result = {};
+
+   //--- Close all positions
+   int total = PositionsTotal();
+   for(int i = total - 1; i >= 0; i--)
+   {
+      if(PositionGetSymbol(i) == symbolName && PositionGetInteger(POSITION_MAGIC) == MagicNumber)
+      {
+         ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+
+         ZeroMemory(request);
          request.action = TRADE_ACTION_DEAL;
-         request.position = ticket;
-         request.symbol = _Symbol;
+         request.position = PositionGetInteger(POSITION_TICKET);
+         request.symbol = symbolName;
          request.volume = PositionGetDouble(POSITION_VOLUME);
-         request.type = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ?
-                        ORDER_TYPE_SELL : ORDER_TYPE_BUY;
-         request.price = (request.type == ORDER_TYPE_SELL) ?
-                         SymbolInfoDouble(_Symbol, SYMBOL_BID) :
-                         SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+         request.type = (posType == POSITION_TYPE_BUY) ? ORDER_TYPE_SELL : ORDER_TYPE_BUY;
+         request.price = (posType == POSITION_TYPE_BUY) ? bid : ask;
          request.magic = MagicNumber;
 
          OrderSend(request, result);
@@ -437,9 +443,11 @@ void UpdateComment()
 int CountPositions()
 {
    int count = 0;
-   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   int total = PositionsTotal();
+
+   for(int i = 0; i < total; i++)
    {
-      if(PositionGetSymbol(i) == _Symbol && PositionGetInteger(POSITION_MAGIC) == MagicNumber)
+      if(PositionGetSymbol(i) == symbolName && PositionGetInteger(POSITION_MAGIC) == MagicNumber)
          count++;
    }
    return count;
