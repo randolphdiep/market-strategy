@@ -16,12 +16,7 @@ input int      TakeProfitPoints = 50;             // Take profit in points
 input int      MagicNumber = 123456;              // Magic number
 
 input group "=== Risk Management ==="
-input double   MaxSpreadPoints = 30;              // Maximum allowed spread (points)
-input double   MaxPositionSize = 1.0;             // Maximum total position size (lots)
 input double   DailyLossLimit = 100.0;            // Daily loss limit in account currency
-input bool     UseVolatilityFilter = true;        // Enable volatility filter
-input int      VolatilityPeriod = 20;             // Period for ATR calculation
-input double   MaxVolatilityMultiplier = 2.0;     // Max ATR multiplier vs average
 
 input group "=== Trading Hours ==="
 input bool     UseTradingHours = false;           // Enable trading hours filter
@@ -29,7 +24,6 @@ input int      StartHour = 8;                     // Trading start hour
 input int      EndHour = 18;                      // Trading end hour
 
 input group "=== Advanced ==="
-input int      Slippage = 10;                     // Maximum slippage in points
 input bool     CloseOnDailyLimit = true;          // Close all on daily limit
 input int      OrderDistanceMin = 10;             // Minimum distance from price (points)
 input int      MaxPositionHours = 48;             // Close position after N hours (0=disabled)
@@ -43,8 +37,6 @@ datetime lastBarTime;
 double dailyStartBalance;
 double dailyProfit;
 int currentDay;
-double averageVolatility;
-int volatilityHandle;
 int barsSinceGridRecreation = 0;  // Track bars since last grid recreation
 
 //+------------------------------------------------------------------+
@@ -52,17 +44,6 @@ int barsSinceGridRecreation = 0;  // Track bars since last grid recreation
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   //--- Initialize volatility indicator
-   if(UseVolatilityFilter)
-   {
-      volatilityHandle = iATR(_Symbol, PERIOD_CURRENT, VolatilityPeriod);
-      if(volatilityHandle == INVALID_HANDLE)
-      {
-         Print("Error creating ATR indicator");
-         return INIT_FAILED;
-      }
-   }
-
    //--- Initialize daily tracking
    MqlDateTime dt;
    TimeToStruct(TimeCurrent(), dt);
@@ -89,9 +70,6 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-   if(volatilityHandle != INVALID_HANDLE)
-      IndicatorRelease(volatilityHandle);
-
    Print("Market Maker EA stopped. Reason: ", reason);
 }
 
@@ -190,23 +168,6 @@ bool CheckDailyLossLimit()
 //+------------------------------------------------------------------+
 bool CheckTradingConditions()
 {
-   //--- Check spread
-   double spread = (SymbolInfoDouble(_Symbol, SYMBOL_ASK) -
-                    SymbolInfoDouble(_Symbol, SYMBOL_BID)) / _Point;
-
-   if(spread > MaxSpreadPoints)
-   {
-      Comment("Spread too high: ", DoubleToString(spread, 1), " points");
-      return false;
-   }
-
-   //--- Check volatility
-   if(UseVolatilityFilter && !CheckVolatility())
-   {
-      Comment("Volatility too high");
-      return false;
-   }
-
    //--- Check trading hours
    if(UseTradingHours && !CheckTradingHours())
    {
@@ -214,38 +175,6 @@ bool CheckTradingConditions()
       DeleteAllPendingOrders();
       return false;
    }
-
-   //--- Check position size limit
-   if(GetTotalPositionSize() >= MaxPositionSize)
-   {
-      Comment("Maximum position size reached");
-      return false;
-   }
-
-   return true;
-}
-
-//+------------------------------------------------------------------+
-//| Check volatility filter                                          |
-//+------------------------------------------------------------------+
-bool CheckVolatility()
-{
-   double atr[];
-   ArraySetAsSeries(atr, true);
-
-   if(CopyBuffer(volatilityHandle, 0, 0, VolatilityPeriod * 2, atr) <= 0)
-      return true; // Allow trading if can't get volatility
-
-   //--- Calculate average ATR
-   double sumATR = 0;
-   for(int i = VolatilityPeriod; i < VolatilityPeriod * 2; i++)
-      sumATR += atr[i];
-   averageVolatility = sumATR / VolatilityPeriod;
-
-   //--- Compare current ATR to average
-   double currentATR = atr[0];
-   if(currentATR > averageVolatility * MaxVolatilityMultiplier)
-      return false;
 
    return true;
 }
@@ -264,23 +193,6 @@ bool CheckTradingHours()
    return false;
 }
 
-//+------------------------------------------------------------------+
-//| Get total position size                                          |
-//+------------------------------------------------------------------+
-double GetTotalPositionSize()
-{
-   double totalLots = 0;
-
-   for(int i = PositionsTotal() - 1; i >= 0; i--)
-   {
-      if(PositionGetSymbol(i) == _Symbol && PositionGetInteger(POSITION_MAGIC) == MagicNumber)
-      {
-         totalLots += PositionGetDouble(POSITION_VOLUME);
-      }
-   }
-
-   return totalLots;
-}
 
 //+------------------------------------------------------------------+
 //| Count grid orders                                                |
@@ -371,7 +283,6 @@ bool PlacePendingOrder(ENUM_ORDER_TYPE orderType, double price, double tp, doubl
    request.price = price;
    request.tp = tp;
    request.sl = sl;
-   request.deviation = Slippage;
    request.magic = MagicNumber;
    request.comment = "Grid MM";
 
@@ -418,7 +329,6 @@ void ManageOrders()
                request.volume = PositionGetDouble(POSITION_VOLUME);
                request.type = (posType == POSITION_TYPE_BUY) ? ORDER_TYPE_SELL : ORDER_TYPE_BUY;
                request.price = (posType == POSITION_TYPE_BUY) ? bid : ask;
-               request.deviation = Slippage;
                request.magic = MagicNumber;
                request.comment = "Max hours exceeded";
 
@@ -495,7 +405,6 @@ void CloseAllOrders()
          request.price = (request.type == ORDER_TYPE_SELL) ?
                          SymbolInfoDouble(_Symbol, SYMBOL_BID) :
                          SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-         request.deviation = Slippage;
          request.magic = MagicNumber;
 
          OrderSend(request, result);
@@ -516,18 +425,8 @@ void UpdateComment()
    string comment = "\n=== GRID MARKET MAKER ===\n";
    comment += "Daily P/L: " + DoubleToString(dailyProfit, 2) + " / " +
               DoubleToString(-DailyLossLimit, 2) + "\n";
-   comment += "Total Position: " + DoubleToString(GetTotalPositionSize(), 2) +
-              " / " + DoubleToString(MaxPositionSize, 2) + " lots\n";
    comment += "Pending Orders: " + IntegerToString(CountGridOrders()) + "\n";
    comment += "Active Positions: " + IntegerToString(CountPositions()) + "\n";
-
-   double spread = (SymbolInfoDouble(_Symbol, SYMBOL_ASK) -
-                    SymbolInfoDouble(_Symbol, SYMBOL_BID)) / _Point;
-   comment += "Spread: " + DoubleToString(spread, 1) + " / " +
-              DoubleToString(MaxSpreadPoints, 1) + " points\n";
-
-   if(UseVolatilityFilter)
-      comment += "Volatility: OK\n";
 
    Comment(comment);
 }
