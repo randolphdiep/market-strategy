@@ -32,6 +32,7 @@ input group "=== Advanced ==="
 input int      Slippage = 10;                     // Maximum slippage in points
 input bool     CloseOnDailyLimit = true;          // Close all on daily limit
 input int      OrderDistanceMin = 10;             // Minimum distance from price (points)
+input int      MaxPositionHours = 48;             // Close position after N hours (0=disabled)
 
 input group "=== Grid Recreation Settings ==="
 input int      RecreateEveryNBars = 0;            // Recreate grid every N bars (0=disabled)
@@ -210,6 +211,7 @@ bool CheckTradingConditions()
    if(UseTradingHours && !CheckTradingHours())
    {
       Comment("Outside trading hours");
+      DeleteAllPendingOrders();
       return false;
    }
 
@@ -387,23 +389,62 @@ bool PlacePendingOrder(ENUM_ORDER_TYPE orderType, double price, double tp, doubl
 //+------------------------------------------------------------------+
 void ManageOrders()
 {
-   double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+   datetime currentTime = TimeCurrent();
+
+   MqlTradeRequest request = {};
+   MqlTradeResult result = {};
+
+   //--- Check and close positions that exceeded max hours
+   if(MaxPositionHours > 0)
+   {
+      for(int i = PositionsTotal() - 1; i >= 0; i--)
+      {
+         if(PositionGetSymbol(i) == _Symbol && PositionGetInteger(POSITION_MAGIC) == MagicNumber)
+         {
+            datetime positionOpenTime = (datetime)PositionGetInteger(POSITION_TIME);
+            int hoursOpen = (int)((currentTime - positionOpenTime) / 3600);
+
+            if(hoursOpen >= MaxPositionHours)
+            {
+               ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+
+               ZeroMemory(request);
+               request.action = TRADE_ACTION_DEAL;
+               request.position = PositionGetInteger(POSITION_TICKET);
+               request.symbol = _Symbol;
+               request.volume = PositionGetDouble(POSITION_VOLUME);
+               request.type = (posType == POSITION_TYPE_BUY) ? ORDER_TYPE_SELL : ORDER_TYPE_BUY;
+               request.price = (posType == POSITION_TYPE_BUY) ? bid : ask;
+               request.deviation = Slippage;
+               request.magic = MagicNumber;
+               request.comment = "Max hours exceeded";
+
+               if(OrderSend(request, result))
+                  Print("Position #", request.position, " closed after ", hoursOpen, " hours");
+               else
+                  Print("Failed to close position #", request.position, ": ", result.retcode);
+            }
+         }
+      }
+   }
 
    //--- Check if pending orders are too close to current price
+   double minDistancePoints = OrderDistanceMin * point;
+
    for(int i = OrdersTotal() - 1; i >= 0; i--)
    {
       ulong ticket = OrderGetTicket(i);
       if(OrderGetString(ORDER_SYMBOL) == _Symbol && OrderGetInteger(ORDER_MAGIC) == MagicNumber)
       {
          double orderPrice = OrderGetDouble(ORDER_PRICE_OPEN);
-         double distance = MathAbs(orderPrice - currentPrice) / point;
+         double distance = MathAbs(orderPrice - bid);
 
-         //--- Delete order if too close to price
-         if(distance < OrderDistanceMin)
+         if(distance < minDistancePoints)
          {
-            MqlTradeRequest request = {};
-            MqlTradeResult result = {};
+            ZeroMemory(request);
             request.action = TRADE_ACTION_REMOVE;
             request.order = ticket;
             OrderSend(request, result);
